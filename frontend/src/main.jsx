@@ -17,6 +17,8 @@ import { configureChains, createConfig, WagmiConfig } from 'wagmi';
 import { goerli } from 'wagmi/chains';
 import { alchemyProvider } from 'wagmi/providers/alchemy';
 import { publicProvider } from 'wagmi/providers/public';
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+
 
 const { chains, publicClient } = configureChains(
   [goerli],
@@ -44,37 +46,20 @@ const livepeerClient = createReactClient({
   }),
 });
 
-const CustomAvatar = ({ address, ensImage, size }) => {
-  const color = generateColorFromAddress(address);
-  return ensImage ? (
-    <img
-      src={ensImage}
-      width={size}
-      height={size}
-      style={{ borderRadius: 999 }}
-    />
-  ) : (
-    <div
-      style={{
-        backgroundColor: color,
-        borderRadius: 999,
-        height: size,
-        width: size,
-      }}
-    >
-      :^)
-    </div>
-  );
-};
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <WagmiConfig config={wagmiConfig} avatar={CustomAvatar}>
+    <WagmiConfig config={wagmiConfig}>
       <RainbowKitProvider chains={chains}>
-        <LivepeerConfig client={livepeerClient}>
-          <App />
-        </LivepeerConfig>
-      </RainbowKitProvider>
+    <LivepeerConfig client={livepeerClient}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<App />} />
+        </Routes>
+      </BrowserRouter>
+
+    </LivepeerConfig>
+    </RainbowKitProvider>
     </WagmiConfig>
   </React.StrictMode>
 );

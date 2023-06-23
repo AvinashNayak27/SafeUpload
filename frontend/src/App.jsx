@@ -18,62 +18,90 @@ const App = () => {
   const [droppedFileName, setDroppedFileName] = useState("");
   const [rootCid, setRootCid] = useState(null);
 
+  const Delete = async () => {
+    const deleteResponse = await axios.post("http://localhost:3000/deleteVideo")
+    console.log(deleteResponse.data)
+     setTimeout(() => {
+    setMessages([...messages, "Video deleted from server"]);
+    }, 5000);
+    setLoading(false);
+    const deleteResponse2 = await axios.post("http://localhost:3000/deleteSnapshots")
+    console.log(deleteResponse2.data)
+    setTimeout(() => {
+      setMessages([...messages, "Snapshots deleted from server"]);
+    }, 5000);
+    setTimeout(() => {
+      setMessages([]);
+    }, 5000);
+  }
+
+
 
   const onDrop = async (acceptedFiles) => {
-    const videoPath = acceptedFiles[0].path;
-    setDroppedFileName(acceptedFiles[0].name);
+    const videoFile = acceptedFiles[0];
+    setDroppedFileName(videoFile.name);
+    setLoading(true);
 
     try {
-      setLoading(true);
-      const response = await axios.post("http://localhost:3000/nsfwcheck", {
-        videoPath,
-      });
+      const formData = new FormData();
+      formData.append("video", videoFile);
 
-      const { nsfwContent } = response.data;
-      console.log(nsfwContent); // Add this line
+      const response = await axios.post(
+        "http://localhost:3000/upload",
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
 
-      if (nsfwContent?.length === 1) {
-        setMessages([
-          ...messages,
-          "NSFW content not detected. Uploading asset to Livepeer...",
-        ]);
 
-        setLoading(true);
-        const assetResponse = await axios.post(
-          "http://localhost:3000/uploadtolivepeer",
-          {
-            name: videoPath.slice(0, -4),
-            description: "Test for NSFW content",
-            videoUrl: videoPath,
-          }
-        );
-        console.log("Asset uploaded to Livepeer");
-        console.log(assetResponse.data.asset);
-        setAsset(assetResponse.data.asset);
-        setMessages([...messages, "Asset uploaded to Livepeer"]);
+      console.log(response?.data?.uploadPath); // Handle the server response
+      if (response?.data?.uploadPath) {
+        const serverpath = response?.data?.uploadPath;
+       
+        const nsfwcheck = await axios.post("http://localhost:3000/nsfwcheck", {
+          videoPath: serverpath,
+        });
+        console.log(nsfwcheck.data);
+        if (nsfwcheck.data?.nsfwContent?.length === 1) {
+          setLoading(false);
+          setMessages([
+            ...messages,
+            "NSFW content not detected. Uploading asset to Livepeer...",
+          ]);
 
-        setLoading(true);
-        const rootCidResponse = await axios.post(
-          "http://localhost:3000/uploadtow3",
-          { videoPath }
-        );
-        console.log("Root CID uploaded to W3 Storage");
-        console.log(rootCidResponse.data.rootCid);
-        setRootCid(rootCidResponse.data.rootCid);
-        setMessages([...messages, "Video uploaded to W3 Storage"]);
-        setTimeout(() => {
-          setMessages([]);
-        }, 5000);
-      } else {
-        setMessages(["Cannot upload because your video has NSFW content"]);
-        setTimeout(() => {
-          setMessages([]);
-        }, 5000);
+          const assetResponse = await axios.post(
+            "http://localhost:3000/uploadtolivepeer",
+            {
+              name: serverpath.slice(0, -4).split("/").pop(),
+              description: "Test for NSFW content",
+              videoUrl: serverpath,
+            }
+          );
+          console.log("Asset uploaded to Livepeer");
+          console.log(assetResponse.data.asset);
+          setAsset(assetResponse.data.asset);
+          setMessages([...messages, "Asset uploaded to Livepeer"]);
+
+          const rootCidResponse = await axios.post(
+            "http://localhost:3000/uploadtow3",
+            { videoPath: serverpath }
+          );
+          console.log("Root CID uploaded to W3 Storage");
+          console.log(rootCidResponse.data.rootCid);
+          setRootCid(rootCidResponse.data.rootCid);
+          setMessages([...messages, "Video uploaded to W3 Storage"]);
+          await Delete()
+        }
+        else {
+          setLoading(false);
+          setMessages(["Cannot upload because your video has NSFW content"]);
+          await Delete()
+        }
+
       }
     } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
+      console.log(error); // Handle error
     }
   };
 
@@ -115,25 +143,25 @@ const App = () => {
 
 
       <div
-  className="App-header"
-  style={{
-    padding: "20px",
-    border: "1px dashed gray",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center"
-  }}
->
-  <div style={{ display: 'flex', alignItems: 'center', marginLeft: '10px' }}>
-    <ConnectButton accountStatus={"avatar"} />
-    {isConnected && (
-      <div style={{ display: 'flex', alignItems: 'center', marginLeft: '10px' }}>
-        <h4 style={{ marginRight: '10px' }}>ENS: {ensName}</h4>
-        <img src={ensText} style={{ width: '48px', height: '75px' }} />
+        className="App-header"
+        style={{
+          padding: "20px",
+          border: "1px dashed gray",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center"
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', marginLeft: '10px' }}>
+          <ConnectButton accountStatus={"avatar"} />
+          {isConnected && (
+            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '10px' }}>
+              <h4 style={{ marginRight: '10px' }}>ENS: {ensName}</h4>
+              <img src={ensText} style={{ width: '48px', height: '75px' }} />
+            </div>
+          )}
+        </div>
       </div>
-    )}
-  </div>
-</div>
 
 
       {isConnected && <div>

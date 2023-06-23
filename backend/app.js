@@ -8,10 +8,12 @@ const ffmpeg = require("ffmpeg-static");
 const cors = require("cors");
 const livepeer = require("@livepeer/react");
 const w3 = require("web3.storage");
-
+const fileUpload = require("express-fileupload");
 const app = express();
 const port = 3000;
 app.use(cors());
+app.use(fileUpload());
+app.use(express.json());
 const { provider } = livepeer.createClient({
   provider: livepeer.studioProvider({
     apiKey: "76831c0e-4b22-4db5-9867-45362ce2bb32",
@@ -25,6 +27,8 @@ const client = new w3.Web3Storage({ token: API_KEY });
 
 // Output directory to save the snapshots
 const outputDirectory = "data";
+
+const videoDirectory = "video";
 
 // Frame rate (number of frames per second)
 const frameRate = 0.1; // Change this value as desired
@@ -82,11 +86,36 @@ const generateSnapshots = async (videoPath) => {
   });
 };
 
-app.use(express.json());
+app.post("/upload", async (req, res) => {
+  if (!req.files || !req.files.video) {
+    return res.status(400).send("No video file uploaded");
+  }
+
+  const video = req.files.video;
+  if (video.mimetype !== "video/mp4") {
+    return res
+      .status(400)
+      .send("Invalid file format. Only .mp4 files are allowed");
+  }
+
+  // Move the video file to the desired location on the server
+  const uploadPath = path.join(__dirname, "video", video.name);
+  video.mv(uploadPath, (error) => {
+    if (error) {
+      console.error("Error:", error);
+      return res
+        .status(500)
+        .send("An error occurred while uploading the video");
+    }
+  });
+  res.send({ uploadPath });
+});
 
 app.post("/nsfwcheck", async (req, res) => {
   try {
     const { videoPath } = req.body;
+    console.log("Video path:", videoPath);
+
     await snapshotsGeneratedPromise;
     snapshotsGeneratedPromise = generateSnapshots(videoPath);
 
@@ -176,6 +205,63 @@ app.post("/uploadtolivepeer", async (req, res) => {
   } catch (error) {
     console.error("Error:", error);
     res.status(500).json({ error: "An error occurred during Livepeer upload" });
+  }
+});
+
+app.post("/deleteSnapshots", async (req, res) => {
+  try {
+    fs.readdir(outputDirectory, (err, files) => {
+      if (err) {
+        console.log("Unable to scan directory: " + err);
+        return;
+      }
+
+      // Iterate through each file in the directory
+      files.forEach((file) => {
+        const filePath = path.join(outputDirectory, file);
+
+        // Delete the file
+        fs.unlink(filePath, (error) => {
+          if (error) {
+            console.log("Error deleting file: " + error);
+          } else {
+            console.log("Successfully deleted file: " + filePath);
+          }
+        });
+      });
+    });
+    res.json({ message: "Successfully deleted all files" });
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).json({ error: "An error occurred while deleting files" });
+  }
+});
+app.post("/deleteVideo", async (req, res) => {
+  try {
+    fs.readdir(videoDirectory, (err, files) => {
+      if (err) {
+        console.log("Unable to scan directory: " + err);
+        return;
+      }
+
+      // Iterate through each file in the directory
+      files.forEach((file) => {
+        const filePath = path.join(videoDirectory, file);
+
+        // Delete the file
+        fs.unlink(filePath, (error) => {
+          if (error) {
+            console.log("Error deleting file: " + error);
+          } else {
+            console.log("Successfully deleted file: " + filePath);
+          }
+        });
+      });
+    });
+    res.json({ message: "Successfully deleted video" });
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).json({ error: "An error occurred while deleting files" });
   }
 });
 
